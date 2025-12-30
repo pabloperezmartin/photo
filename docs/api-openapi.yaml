@@ -1,0 +1,92 @@
+
+openapi: 3.0.3
+info:
+  title: Catalogo Foto API
+  version: 0.1.0
+paths:
+  /books:
+    get:
+      summary: Lista de libros
+      parameters:
+        - in: query
+          name: query
+          schema:
+            type: string
+        - in: query
+          name: author
+          schema:
+            type: string
+        - in: query
+          name: year
+          schema:
+            type: integer
+        - in: query
+          name: topic
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Crear libro
+      responses:
+        '201':
+          description: Creado
+  /books/{id}:
+    get:
+      summary: Obtener libro
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+    put:
+      summary: Actualizar libro
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+    delete:
+      summary: Eliminar libro
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Sin contenido
+  /ingest/isbn:
+    post:
+      summary: Ingesta por ISBN-13
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                isbn13:
+                  type: string
+      responses:
+        '200': { description: OK }
+  /exports/csv:
+    get:
+      summary: Exportar CSV
+      parameters:
+        - in: query
+          name: ids
+          schema:
+            type: string
+      responses:
+        '200': { description: OK }

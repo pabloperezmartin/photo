@@ -1,0 +1,12 @@
+
+{
+  "expo": {
+    "name": "Catalogo Foto",
+    "slug": "catalogo-foto",
+    "scheme": "catalogo",
+    "sdkVersion": "51.0.0",
+    "platforms": ["ios", "android"],
+    "orientation": "portrait",
+    "version": "0.1.0"
+  }
+}

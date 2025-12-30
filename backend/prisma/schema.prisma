@@ -1,0 +1,98 @@
+
+// Prisma schema simplificada (MVP)
+// Para producción, reemplazar el servicio en memoria por Prisma y estos modelos.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Book {
+  id            String   @id @default(cuid())
+  isbn13        String   @unique
+  title         String
+  subtitle      String?
+  language      String?
+  edition       String?
+  publishedYear Int?
+  description   String?
+  coverUrl      String?
+  publisher     Publisher? @relation(fields: [publisherId], references: [id])
+  publisherId   String?
+  authors       BookAuthor[]
+  topics        BookTopic[]
+  tags          BookTag[]
+  sources       BookSource[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Author {
+  id    String @id @default(cuid())
+  name  String
+  books BookAuthor[]
+}
+
+model Publisher {
+  id    String @id @default(cuid())
+  name  String @unique
+  books Book[]
+}
+
+model Topic {
+  id    String @id @default(cuid())
+  key   String @unique
+  name  String @unique
+  books BookTopic[]
+}
+
+model Tag {
+  id    String @id @default(cuid())
+  name  String @unique
+  books BookTag[]
+}
+
+model BookAuthor {
+  bookId   String
+  authorId String
+  book     Book   @relation(fields: [bookId], references: [id])
+  author   Author @relation(fields: [authorId], references: [id])
+  @@id([bookId, authorId])
+}
+
+model BookTopic {
+  bookId String
+  topicId String
+  book   Book  @relation(fields: [bookId], references: [id])
+  topic  Topic @relation(fields: [topicId], references: [id])
+  @@id([bookId, topicId])
+}
+
+model BookTag {
+  bookId String
+  tagId String
+  book  Book @relation(fields: [bookId], references: [id])
+  tag   Tag  @relation(fields: [tagId], references: [id])
+  @@id([bookId, tagId])
+}
+
+model BookSource {
+  id        String   @id @default(cuid())
+  bookId    String
+  book      Book     @relation(fields: [bookId], references: [id])
+  name      String
+  rawPayload Json
+  confidence Float?
+  fetchedAt DateTime @default(now())
+}
+
+model User {
+  id    String  @id @default(cuid())
+  name  String
+  email String  @unique
+  role  String
+}
