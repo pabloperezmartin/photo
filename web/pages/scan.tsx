@@ -1,21 +1,14 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { BrowserMultiFormatReader } from '@zxing/library';
-
-function normalizeEanToIsbn13(ean: string){
-  const s = (ean||'').replace(/[^0-9]/g,'');
-  if (s.length !== 13) return null;
-  if (!s.startsWith('978') && !s.startsWith('979')) return null;
-  const digits = s.split('').map(Number);
-  const sum = digits.slice(0,12).reduce((acc,d,i)=> acc + d * (i%2?3:1), 0);
-  const check = (10 - (sum % 10)) % 10;
-  if (check !== digits[12]) return null;
-  return s;
-}
+import { normalizeEanToIsbn13, normalizeIsbnInput } from '../src/utils/isbn';
 
 export default function ScanPage(){
   const videoRef = useRef<HTMLVideoElement>(null);
   const [result, setResult] = useState<any>(null);
+  const [manualIsbn, setManualIsbn] = useState('');
+  const [err, setErr] = useState<string | null>(null);
+
   useEffect(() => {
     const reader = new BrowserMultiFormatReader();
     async function start(){
@@ -30,20 +23,58 @@ export default function ScanPage(){
             const r = await fetch(base + '/ingest/isbn', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ isbn13 }) });
             const data = await r.json();
             setResult(data);
+            setErr(null);
+          } else {
+            setErr('Código inválido. Prueba otra vez o introduce el ISBN manualmente.');
           }
         }
       });
     }
     start();
-    return () => reader.reset();
+    return () => {
+      reader.reset();
+    };
   }, []);
+
+  async function submitManual(){
+    const normalized = normalizeIsbnInput(manualIsbn);
+    if (!normalized) {
+      setErr('ISBN inválido. Introduce un ISBN-13 válido o un ISBN-10 convertible.');
+      return;
+    }
+    const base = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
+    const r = await fetch(base + '/ingest/isbn', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ isbn13: normalized })
+    });
+    const data = await r.json();
+    setResult(data);
+    setErr(null);
+  }
 
   return (
     <main style={{ padding: 12 }}>
       <h2>Escanear ISBN</h2>
       <video ref={videoRef} style={{ width: '100%', maxWidth: 480 }} />
+      { err && <p style={{ color:'crimson' }}>{err}</p> }
+
+      <div style={{ marginTop: 16, padding: 12, border:'1px solid #ddd', borderRadius: 6 }}>
+        <h3>Introducir ISBN manualmente</h3>
+        <input
+          value={manualIsbn}
+          onChange={e => setManualIsbn(e.target.value)}
+          placeholder="ISBN-13 o ISBN-10"
+          style={{ padding:8, width:'100%', maxWidth: 320 }}
+        />
+        <div style={{ height: 8 }} />
+        <button onClick={submitManual}>Aceptar</button>
+      </div>
+
       { result && (
-        <pre style={{ background:'#f5f5f5', padding:12, marginTop:12 }}>{JSON.stringify(result, null, 2)}</pre>
+        <>
+          <h3 style={{ marginTop: 16 }}>Resultado</h3>
+          <pre style={{ background:'#f5f5f5', padding:12 }}>{JSON.stringify(result, null, 2)}</pre>
+        </>
       )}
     </main>
   );
