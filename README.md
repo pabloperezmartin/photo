@@ -20,7 +20,7 @@ docker exec -it catalogo-backend npx prisma migrate deploy
 docker exec -it catalogo-backend node -e "require('./dist/prisma/seed.js').seed()"
 ```
 4. Web PWA: http://localhost:3000
-5. API: http://localhost:4000
+5. API: http://192.168.1.39:4000
 
 ## Licencia
 Código bajo **MIT**. Datos del catálogo recomendados bajo **CC BY 4.0**.

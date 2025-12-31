@@ -12,6 +12,7 @@ export default function App(){
   const [scanned, setScanned] = useState(false);
   const [last, setLast] = useState<any>(null);
   const [showEditor, setShowEditor] = useState(false);
+  const [apiStatus, setApiStatus] = useState<'checking' | 'ok' | 'error'>('checking');
 
   // estado para manual
   const [manualVisible, setManualVisible] = useState(false);
@@ -20,26 +21,82 @@ export default function App(){
   useEffect(() => { (async () => {
     const { status } = await BarCodeScanner.requestPermissionsAsync();
     setHasPermission(status === 'granted');
+    
+    // Verificar conexión con API
+    try {
+      const response = await fetch(API_BASE + '/health', { 
+        method: 'GET',
+        headers: {
+          'ngrok-skip-browser-warning': 'true' // Evita la página de advertencia de ngrok
+        }
+      });
+      
+      const contentType = response.headers.get('content-type');
+      
+      // Si ngrok devuelve HTML, significa que está mostrando la página de advertencia
+      if (contentType && contentType.includes('text/html')) {
+        setApiStatus('error');
+        Alert.alert(
+          '⚠️ Acción requerida: ngrok',
+          `Debes abrir esta URL en el navegador de tu móvil primero:\n\n${API_BASE}\n\n1. Ábrela en Safari/Chrome\n2. Acepta la advertencia de ngrok\n3. Verás el JSON de la API\n4. Vuelve a la app\n\n(Solo necesario la primera vez)`,
+          [
+            { text: 'Copiar URL', onPress: () => console.log('URL:', API_BASE) },
+            { text: 'Entendido' }
+          ]
+        );
+        return;
+      }
+      
+      if (response.ok) {
+        setApiStatus('ok');
+      } else {
+        setApiStatus('error');
+      }
+    } catch (e) {
+      console.error('API no disponible:', e);
+      setApiStatus('error');
+      
+      const isNgrok = API_BASE.includes('ngrok');
+      
+      Alert.alert(
+        'Error de conexión',
+        isNgrok 
+          ? `No se puede conectar a ngrok.\n\n${API_BASE}\n\n1. Verifica que ngrok esté corriendo: "ngrok http 4000"\n2. Abre la URL en el navegador del móvil primero\n3. Acepta la advertencia de ngrok\n4. Vuelve a la app`
+          : `No se puede conectar a la API en:\n${API_BASE}\n\nVerifica que:\n1. Docker esté ejecutándose\n2. Tu móvil esté en la misma red WiFi\n3. La IP local sea correcta`,
+        [{ text: 'OK' }]
+      );
+    }
   })(); }, []);
 
   async function ingestIsbn(isbn13: string) {
     try {
+      console.log('Conectando a:', API_BASE);
       const r = await fetch(API_BASE + '/ingest/isbn', {
         method:'POST',
-        headers:{'Content-Type':'application/json'},
+        headers:{
+          'Content-Type':'application/json',
+          'ngrok-skip-browser-warning': 'true'
+        },
         body: JSON.stringify({ isbn13 })
       });
-      if (!r.ok) throw new Error('API error');
+      if (!r.ok) {
+        const errorText = await r.text();
+        throw new Error(`API error: ${r.status} - ${errorText}`);
+      }
       const data = await r.json();
       setLast(data);
       setShowEditor(true);
     } catch(e) {
+      console.error('Error al conectar con API:', e);
       // offline o error: encola
       const q = await AsyncStorage.getItem('queue');
       const arr = q ? JSON.parse(q) : [];
       arr.push({ isbn13, ts: Date.now() });
       await AsyncStorage.setItem('queue', JSON.stringify(arr));
-      Alert.alert('Guardado offline', 'Se sincronizará cuando haya conexión.');
+      Alert.alert(
+        'Guardado offline', 
+        `No se pudo conectar a ${API_BASE}\n\nSe sincronizará cuando haya conexión.\n\nError: ${e instanceof Error ? e.message : 'Desconocido'}`
+      );
     }
   }
 
@@ -49,7 +106,14 @@ export default function App(){
     const remain = [];
     for (const item of queue){
       try {
-        const r = await fetch(API_BASE + '/ingest/isbn', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ isbn13: item.isbn13 }) });
+        const r = await fetch(API_BASE + '/ingest/isbn', { 
+          method:'POST', 
+          headers:{
+            'Content-Type':'application/json',
+            'ngrok-skip-browser-warning': 'true'
+          }, 
+          body: JSON.stringify({ isbn13: item.isbn13 }) 
+        });
         const data = await r.json();
         setLast(data);
       } catch(e){
@@ -69,7 +133,14 @@ export default function App(){
           ? `${API_BASE}/books/${op.payload.id}`
           : `${API_BASE}/books`;
         const method = op.type === 'update' ? 'PUT' : 'POST';
-        const r = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(op.payload) });
+        const r = await fetch(url, { 
+          method, 
+          headers:{
+            'Content-Type':'application/json',
+            'ngrok-skip-browser-warning': 'true'
+          }, 
+          body: JSON.stringify(op.payload) 
+        });
         await r.json();
       } catch (e) {
         remain.push(op);
@@ -83,15 +154,28 @@ export default function App(){
 
   return (
     <View style={styles.container}>
+      {/* Indicador de estado de API */}
+      <View style={[styles.statusBar, apiStatus === 'ok' ? styles.statusOk : styles.statusError]}>
+        <Text style={styles.statusText}>
+          API: {apiStatus === 'checking' ? '🔍 Verificando...' : apiStatus === 'ok' ? '✅ Conectado' : '❌ Sin conexión'}
+        </Text>
+        <Text style={styles.statusUrlText}>{API_BASE}</Text>
+      </View>
+
       <BarCodeScanner
-        onBarCodeScanned={async ({ data }) => {
-          if (scanned) return;
-          setScanned(true);
-          const isbn13 = normalizeEanToIsbn13(data);
-          if (isbn13) await ingestIsbn(isbn13);
-          else Alert.alert('Código inválido', 'Prueba otra vez o usa la entrada manual.');
-        }}
-        style={{ width: '100%', height: 320 }}
+      onBarCodeScanned={async ({ data, type }) => {
+        Alert.alert('Escaneado', `type=${type}\ndata=${data}`); // <-- LOG TEMPORAL
+        if (scanned) return;
+        setScanned(true);
+
+        const isbn13 = normalizeEanToIsbn13(data);
+        if (isbn13) {
+          await ingestIsbn(isbn13);
+        } else {
+          Alert.alert('Código inválido', 'Prueba otra vez o usa la entrada manual.');
+        }
+      }}
+      style={{ width: '100%', height: 320 }}
       />
 
       {/* Botones principales */}
@@ -120,7 +204,14 @@ export default function App(){
             try {
               const url = b.id ? `${API_BASE}/books/${b.id}` : `${API_BASE}/books`;
               const method = b.id ? 'PUT' : 'POST';
-              const resp = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
+              const resp = await fetch(url, { 
+                method, 
+                headers: { 
+                  'Content-Type': 'application/json',
+                  'ngrok-skip-browser-warning': 'true'
+                }, 
+                body: JSON.stringify(b) 
+              });
               const saved = await resp.json();
               setLast(saved);
               setShowEditor(false);
@@ -173,5 +264,31 @@ export default function App(){
 const styles = StyleSheet.create({
   container: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 12 },
   modal: { flex:1, backgroundColor:'rgba(0,0,0,0.4)', alignItems:'center', justifyContent:'center' },
-  card: { width:'90%', backgroundColor:'#fff', borderRadius:6, padding:16 }
+  card: { width:'90%', backgroundColor:'#fff', borderRadius:6, padding:16 },
+  statusBar: {
+    width: '100%',
+    padding: 10,
+    alignItems: 'center',
+    marginBottom: 10
+  },
+  statusOk: {
+    backgroundColor: '#d4edda',
+    borderColor: '#c3e6cb',
+    borderWidth: 1
+  },
+  statusError: {
+    backgroundColor: '#f8d7da',
+    borderColor: '#f5c6cb',
+    borderWidth: 1
+  },
+  statusText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333'
+  },
+  statusUrlText: {
+    fontSize: 10,
+    color: '#666',
+    marginTop: 2
+  }
 });

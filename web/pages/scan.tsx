@@ -14,12 +14,13 @@ export default function ScanPage(){
     async function start(){
       const devices = await reader.listVideoInputDevices();
       const deviceId = devices[0]?.deviceId;
-      reader.decodeFromVideoDevice(deviceId, videoRef.current!, async (res, err) => {
+      reader.decodeFromVideoDevice(deviceId, videoRef.current!, async (res: { getBarcodeFormat: () => any; getText: () => any; }, _err: any) => {
         if (res) {
+          console.log('Formato:', res.getBarcodeFormat?.(), 'Valor:', res.getText?.());
           const ean = res.getText();
           const isbn13 = normalizeEanToIsbn13(ean);
           if (isbn13){
-            const base = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
+            const base = process.env.NEXT_PUBLIC_API_BASE || 'http://192.168.1.39:4000';
             const r = await fetch(base + '/ingest/isbn', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ isbn13 }) });
             const data = await r.json();
             setResult(data);
@@ -42,7 +43,7 @@ export default function ScanPage(){
       setErr('ISBN inválido. Introduce un ISBN-13 válido o un ISBN-10 convertible.');
       return;
     }
-    const base = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
+    const base = process.env.NEXT_PUBLIC_API_BASE || 'http://192.168.1.39:4000';
     const r = await fetch(base + '/ingest/isbn', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ isbn13: normalized })
@@ -62,7 +63,7 @@ export default function ScanPage(){
         <h3>Introducir ISBN manualmente</h3>
         <input
           value={manualIsbn}
-          onChange={e => setManualIsbn(e.target.value)}
+          onChange={(e: { target: { value: any; }; }) => setManualIsbn(e.target.value)}
           placeholder="ISBN-13 o ISBN-10"
           style={{ padding:8, width:'100%', maxWidth: 320 }}
         />

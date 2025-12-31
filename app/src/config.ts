@@ -1,6 +1,8 @@
 
-// Configuración de la API para la app móvil
-// Cambia esta URL por la IP local de tu PC al desarrollar en red:
-// Ejemplo: export const API_BASE = 'http://192.168.1.23:4000';
-// Por defecto, usa localhost (útil en emuladores Android con redir. o túnel):
-export const API_BASE = process.env.API_BASE || 'http://192.168.1.39:4000';
+// Configuración SIMPLE de la API
+// ngrok debe estar corriendo: ngrok http 4000
+
+export const API_BASE = 'https://aracely-typological-yolande.ngrok-free.dev';
+
+// Debug
+console.log('🔥 API:', API_BASE);
